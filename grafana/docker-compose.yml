@@ -1,0 +1,77 @@
+version: '3.8'
+
+networks:
+  net:
+    external: false
+
+volumes:
+  postgres-db:
+    external: false
+
+services:
+  postgres:
+    image: postgres:alpine
+    container_name: postgres-monitoreo
+    env_file:
+      - .env.db
+    environment:
+      - POSTGRES_INITDB_ARGS=--auth-host=md5 --auth-local=trust
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready" ]
+      interval: 10s
+      timeout: 2s
+      retries: 5
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres-db:/var/lib/postgresql/data
+      - ./scripts:/docker-entrypoint-initdb.d 
+    networks:
+      - net
+  pgadmin:
+    image: dpage/pgadmin4
+    restart: always
+    container_name: pgadmin-monitoreo
+    environment:
+      PGUSER: postgres
+      PGADMIN_DEFAULT_EMAIL: martingaido00@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: 1234
+    ports:
+      - "8080:80"
+    depends_on:
+      - postgres
+    networks:
+      - net
+  
+  grafana: 
+    image: grafana/grafana
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3050:3000"
+    networks:
+      - net
+  
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - net
+  
+  postgres-exporter:
+    image: wrouesnel/postgres_exporter
+    container_name: postgres-exporter
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:postgres@postgres:5432/postgres?sslmode=disable"
+    networks:
+      - net
+
+
